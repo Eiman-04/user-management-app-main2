@@ -6,52 +6,46 @@ on:
       - main
 
 jobs:
-  build-and-deploy:
+  build:
     runs-on: ubuntu-latest
-
+    
     steps:
-    # 1. Checkout du repo
-    - name: Checkout repository
-      uses: actions/checkout@v3
-
-    # 2. Setup Node.js
-    - name: Setup Node.js
-      uses: actions/setup-node@v3
+    - name: Checkout the repository
+      uses: actions/checkout@v2
+    
+    - name: Set up Node.js
+      uses: actions/setup-node@v2
       with:
-        node-version: '18'
+        node-version: '16'
 
-    # 3. Installation des dépendances
     - name: Install dependencies
       run: npm install
-      working-directory: ./frontend
 
-    # 4. Lancement des tests
     - name: Run tests
-      run: npm test --if-present
-      working-directory: ./frontend
+      run: npm test
 
-    # 5. Build Docker image
     - name: Build Docker image
-      run: docker build -t ${{ secrets.DOCKER_USERNAME }}/user-management-app:latest .
+      run: |
+        docker build -t your-docker-image-name .
+    
+    - name: Log in to Docker Hub
+      uses: docker/login-action@v2
+      with:
+        username: ${{ secrets.DOCKER_USERNAME }}
+        password: ${{ secrets.DOCKER_PASSWORD }}
 
-    # 6. Login Docker Hub
-    - name: Docker Login
-      run: echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
+    - name: Push Docker image to Docker Hub
+      run: |
+        docker push your-docker-image-name
 
-    # 7. Push Docker image
-    - name: Push Docker image
-      run: docker push ${{ secrets.DOCKER_USERNAME }}/user-management-app:latest
-
-    # 8. (Optionnel) Déploiement via SSH
-    - name: Deploy via SSH
-      if: ${{ secrets.SSH_HOST != '' }}
-      uses: appleboy/ssh-action@v1.0.0
+    # Optionnel : Déploiement via SSH (si vous avez un serveur VPS, ex. Contabo)
+    - name: Deploy to server (optional)
+      if: secrets.SSH_HOST != ''
+      uses: appleboy/scp-action@v0.1.4
       with:
         host: ${{ secrets.SSH_HOST }}
-        username: ${{ secrets.SSH_USERNAME }}
+        username: ${{ secrets.SSH_USER }}
         key: ${{ secrets.SSH_KEY }}
-        script: |
-          docker pull ${{ secrets.DOCKER_USERNAME }}/user-management-app:latest
-          docker stop app || true
-          docker rm app || true
-          docker run -d --name app -p 3003:3003 ${{ secrets.DOCKER_USERNAME }}/user-management-app:latest
+        port: ${{ secrets.SSH_PORT }}
+        source: "docker-compose.yml"
+        target: "/home/user/app"
