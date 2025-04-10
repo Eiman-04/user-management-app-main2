@@ -3,47 +3,49 @@ name: CI/CD Pipeline
 on:
   push:
     branches:
-      - main
+      - main  # déclenche ce workflow sur chaque push vers la branche main
+  pull_request:
+    branches:
+      - main  # déclenche ce workflow sur chaque PR vers la branche main
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-latest  # utilise un runner Ubuntu
 
     steps:
-      # Etape 1: Checkout du code source
-      - name: Checkout code
-        uses: actions/checkout@v2
+    - name: Checkout repository
+      uses: actions/checkout@v2  # vérifie le dépôt
 
-      # Etape 2: Setup de Node.js
-      - name: Set up Node.js
-        uses: actions/setup-node@v2
-        with:
-          node-version: '16'
+    - name: Set up Node.js
+      uses: actions/setup-node@v2  # configure Node.js
+      with:
+        node-version: '16'  # spécifie la version de Node.js
 
-      # Etape 3: Installation des dépendances
-      - name: Install dependencies
-        run: |
-          npm install
+    - name: Install dependencies
+      run: npm install  # installe les dépendances via npm
 
-      # Etape 4: Lancement des tests
-      - name: Run tests
-        run: |
-          npm test
+    - name: Run tests
+      run: npm test  # lance les tests
 
-      # Etape 5: Build de l'image Docker
-      - name: Build Docker image
-        run: |
-          docker build -t my-app .
+    - name: Build Docker image
+      run: |
+        docker build -t ${{ secrets.DOCKER_USERNAME }}/my-app:$GITHUB_SHA .
+        docker tag ${{ secrets.DOCKER_USERNAME }}/my-app:$GITHUB_SHA ${{ secrets.DOCKER_USERNAME }}/my-app:latest
 
-      # Etape 6: Push de l'image vers Docker Hub
-      - name: Push Docker image to Docker Hub
-        run: |
-          docker login -u ${{ secrets.DOCKER_USERNAME }} -p ${{ secrets.DOCKER_PASSWORD }}
-          docker push my-app
+    - name: Log in to Docker Hub
+      uses: docker/login-action@v2
+      with:
+        username: ${{ secrets.DOCKER_USERNAME }}  # votre nom d'utilisateur Docker Hub
+        password: ${{ secrets.DOCKER_PASSWORD }}  # votre token Docker Hub
 
-      # Etape 7 (Optionnelle): Déploiement via SSH si SSH_HOST est défini
-      - name: Deploy via SSH
-        if: ${{ secrets.SSH_HOST != null }}
-        run: |
-          echo "Deploying to the server..."
-          ssh -i ~/.ssh/id_rsa ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} 'bash deploy.sh'
+    - name: Push Docker image to Docker Hub
+      run: |
+        docker push ${{ secrets.DOCKER_USERNAME }}/my-app:$GITHUB_SHA
+        docker push ${{ secrets.DOCKER_USERNAME }}/my-app:latest
+
+    - name: Deploy to VPS via SSH (Optional)
+      if: secrets.SSH_HOST != '' && secrets.SSH_USER != '' && secrets.SSH_KEY != ''
+      run: |
+        echo "$SSH_KEY" > /tmp/id_rsa  # ajoutez votre clé privée SSH dans un fichier temporaire
+        chmod 600 /tmp/id_rsa
+        ssh -o StrictHostKeyChecking=no -i /tmp/id_rsa ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} "cd /path/to/your/app && docker pull ${{ secrets.DOCKER_USERNAME }}/my-app:latest && docker-compose up -d"
