@@ -10,31 +10,38 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      # Etape 1: Checkout du code source
       - name: Checkout code
         uses: actions/checkout@v2
 
+      # Etape 2: Setup de Node.js
       - name: Set up Node.js
         uses: actions/setup-node@v2
         with:
           node-version: '16'
 
+      # Etape 3: Installation des dépendances
       - name: Install dependencies
         run: |
           npm install
 
+      # Etape 4: Lancement des tests
       - name: Run tests
         run: |
           npm test
 
+      # Etape 5: Build de l'image Docker
       - name: Build Docker image
         run: |
           docker build -t my-app .
 
+      # Etape 6: Push de l'image vers Docker Hub
       - name: Push Docker image to Docker Hub
         run: |
           docker login -u ${{ secrets.DOCKER_USERNAME }} -p ${{ secrets.DOCKER_PASSWORD }}
           docker push my-app
 
+      # Etape 7 (Optionnelle): Déploiement via SSH si SSH_HOST est défini
       - name: Deploy via SSH
         if: ${{ secrets.SSH_HOST != null }}
         run: |
